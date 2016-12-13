@@ -7,16 +7,14 @@ parameters:
     type: string
     label: Image.
     description: Name or id of the image to be used for Spark master and workers.
-    default: ubuntuCloud14
   flavor:
     type: string
     label: Flavor
     description: Name of the flavor (specifications) of instance to be created.
-    default: m1.medium
   key:
     type: string
     label: Key name
-    description: Name of keypair used for authentication with the instances.
+    description: Name of keypair used for authentication with the instance.
   private_network:
     type: string
     label: Private Network
@@ -29,7 +27,6 @@ parameters:
     type: string
     label: Security group
     description: Name of the security group for the Spark master node.
-	
 resources:
   port:
     type: OS::Neutron::Port
@@ -38,7 +35,6 @@ resources:
       security_groups:
         - { get_param: security_group }
         - default
-
   master_node:
     type: OS::Nova::Server
     properties:
@@ -68,26 +64,23 @@ resources:
         cp /opt/spark/conf/spark-env.sh.template /opt/spark/conf/spark-env.sh
         sed -i 's/# - SPARK_MASTER_OPTS.*/SPARK_MASTER_OPTS="-Dspark.deploy.defaultCores=4 -Dspark.executor.memory=2G"/' /opt/spark/conf/spark-env.sh
         echo $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/) $HOSTNAME | sudo tee -a /etc/hosts
-        /opt/spark/sbin/start-master.sh -h $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/)
-            
+        /opt/spark/sbin/start-master.sh -h $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/)            
   floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
       floating_network: { get_param: public_network }
-
   floating_ip_assoc:
     type: OS::Neutron::FloatingIPAssociation
     properties:
       floatingip_id: { get_resource: floating_ip }
-      port_id: { get_resource: port }
-	  
- outputs:
+      port_id: { get_resource: port }  
+outputs:
   fixed_master:
     description: Fixed IP assigned to the master node.
     value: { get_attr: [master_node, networks, private_network, 0]}
   name:
     description: Name of the master node instance.
-    value: { get_attr: [server1_instance, name] }
+    value: { get_attr: [master_node, name] }
   floating_master:
     description: Floating IP address of the master node.
     value: { get_attr: [floating_ip, floating_ip_address] }

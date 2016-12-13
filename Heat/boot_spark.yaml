@@ -61,21 +61,21 @@ resources:
           direction: egress
         - protocol: icmp
           direction: ingress
-  master:
-    type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/heat/boot_sparkmas.yaml
+  masterspark:
+    type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/Heat/boot_sparkmas.yaml
     properties:
       image: { get_param: image }
       flavor: { get_param: flavor }
-      key: { get_param: key }
       private_network: { get_param: private_network }
       public_network: { get_param: public_network }
       security_group: { get_resource: security_group }
-  worker:
-    type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/heat/boot_sparkslv.yaml
+      key: { get_param: key }
+  workerspark:
+    type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/Heat/boot_sparkslv.yaml
     properties:
       image: { get_param: image }
       flavor: { get_param: flavor }
-      key: { get_param: key }
       private_network: { get_param: private_network }
       security_group: { get_resource: security_group }
-      master_ip: { get_attr: [master_node, fixed_master]}
+      master_ip: { get_attr: [masterspark, fixed_master]}
+      key: { get_param: key }
