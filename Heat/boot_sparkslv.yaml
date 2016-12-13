@@ -1,0 +1,68 @@
+heat_template_version: 2013-05-23
+
+description: Initialises Spark slave node.
+
+parameters:
+  image:
+    type: string
+    label: Image.
+    description: Name or id of the image to be used for Spark master and workers.
+  flavor:
+    type: string
+    label: Flavor
+    description: Name of the flavor (specifications) of instance to be created.
+  key:
+    type: string
+    label: Key name
+    description: Name of keypair used for authentication with the instance.
+  private_network:
+    type: string
+    label: Private Network
+    description: Private network on which the Spark cluster will reside.
+  security_group:
+    type: string
+    label: Security group
+    description: Name of the security group for the Spark master node.
+  master_ip:
+    type: string
+    label: Master node IP address
+    description: Location of the master node on the private network.
+
+resources:
+  port:
+    type: OS::Neutron::Port
+    properties:
+      network: { get_param: private_network }
+      security_groups:
+        - { get_param: security_group }
+        - default
+
+  client_instance:
+    type: OS::Nova::Server
+    properties:
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key_name: { get_param: key }
+      networks:
+        - port: { get_resource: port }
+      user_data_format: RAW
+      user_data:
+        str_replace:
+          params:
+            __master_ip__: { get_param: master_ip }
+          template: |
+            #!/bin/bash
+            SPARK_VERSION="2.0.2"
+            HADOOP_VERSION="2.7"
+            APACHE_MIRROR="ftp.carnet.hr/misc/apache"
+            LOCALNET="10.20.30.0/24"
+            ufw allow from $LOCALNET
+            ufw allow 8081/tcp
+            apt-get -y update
+            apt-get -y install openjdk-7-jdk
+            curl -o /tmp/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz http://$APACHE_MIRROR/spark/spark-$SPARK_VERSION/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz
+            tar xvz -C /opt -f /tmp/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz
+            ln -s /opt/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/ /opt/spark
+            chown -R root.root /opt/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/*
+            echo $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/) $HOSTNAME | sudo tee -a /etc/hosts
+            /opt/spark/sbin/start-slave.sh spark://__master_ip__:7077

@@ -1,0 +1,81 @@
+heat_template_version: 2013-05-23
+
+parameters:
+  image:
+    type: string
+    label: Image.
+    description: Name or id of the image to be used for Spark master and workers.
+    default: ubuntuCloud14
+  flavor:
+    type: string
+    label: Flavor
+    description: Name of the flavor (specifications) of instance to be created.
+    default: m1.medium
+  key:
+    type: string
+    label: Key name
+    description: Name of keypair used for authentication with the instances.
+    default: bdstream
+  private_network:
+    type: string
+    label: Private Network
+    description: Private network on which the Spark cluster will reside.
+    default: sparknet
+  public_network:
+    type: string
+    label: Public Network
+    description: Public Network where the Spark Master node is accessible.
+    default: admin_floating_net
+
+resources:
+  security_group:
+    type: OS::Neutron::SecurityGroup
+    properties:
+      name: bdstream
+      rules:
+        - port_range_min: 1
+          port_range_max: 65535
+          protocol: tcp
+          direction: ingress
+        - port_range_min: 1
+          port_range_max: 65535
+          protocol: tcp
+          direction: egress
+        - port_range_min: 22
+          port_range_max: 22
+          protocol: tcp
+          direction: ingress
+        - port_range_min: 22
+          port_range_max: 22
+          protocol: tcp
+          direction: egress
+        - port_range_min: 80
+          port_range_max: 80
+          protocol: tcp
+          direction: ingress
+        - port_range_min: 80
+          port_range_max: 80
+          protocol: tcp
+          direction: egress
+        - protocol: icmp
+          direction: egress
+        - protocol: icmp
+          direction: ingress
+  master:
+    type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/heat/boot_sparkmas.yaml
+    properties:
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key: { get_param: key }
+      private_network: { get_param: private_network }
+      public_network: { get_param: public_network }
+      security_group: { get_resource: security_group }
+  worker:
+    type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/heat/boot_sparkslv.yaml
+    properties:
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      key: { get_param: key }
+      private_network: { get_param: private_network }
+      security_group: { get_resource: security_group }
+      master_ip: { get_attr: [master_node, fixed_master]}
