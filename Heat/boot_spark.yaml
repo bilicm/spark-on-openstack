@@ -31,7 +31,7 @@ resources:
   security_group:
     type: OS::Neutron::SecurityGroup
     properties:
-      name: bdstream
+      name: spark
       rules:
         - port_range_min: 1
           port_range_max: 65535
@@ -72,10 +72,11 @@ resources:
       key: { get_param: key }
   workerspark:
     type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/Heat/boot_sparkslv.yaml
+    depends_on: masterspark
     properties:
       image: { get_param: image }
       flavor: { get_param: flavor }
       private_network: { get_param: private_network }
       security_group: { get_resource: security_group }
-      master_ip: { get_attr: [masterspark, fixed_master]}
+      master_ip: { get_attr: [masterspark, master_ip]}
       key: { get_param: key }

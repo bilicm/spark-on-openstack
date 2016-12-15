@@ -27,14 +27,26 @@ parameters:
     type: string
     label: Security group
     description: Name of the security group for the Spark master node.
+
 resources:
-  port:
+  port_master:
     type: OS::Neutron::Port
     properties:
       network: { get_param: private_network }
       security_groups:
         - { get_param: security_group }
         - default
+
+  master_wait_condition:
+    type: OS::Heat::WaitCondition
+    properties:
+      handle: { get_resource: wait_handle }
+      count: 1
+      timeout: 3600
+
+  wait_handle:
+    type: OS::Heat::WaitConditionHandle
+
   master_node:
     type: OS::Nova::Server
     properties:
@@ -42,29 +54,35 @@ resources:
       flavor: { get_param: flavor }
       key_name: { get_param: key }
       networks:
-        - port: { get_resource: port }
-      user_data: |
-        #!/bin/bash
-        SPARK_VERSION="2.0.2"
-        HADOOP_VERSION="2.7"
-        APACHE_MIRROR="ftp.carnet.hr/misc/apache"
-        LOCALNET="10.20.30.0/24"
-        ufw allow from $LOCALNET
-        ufw allow 80/tcp
-        ufw allow 443/tcp
-        ufw allow 4040:4050/tcp
-        ufw allow 7077/tcp
-        ufw allow 8080/tcp
-        apt-get -y update
-        apt-get -y install openjdk-7-jdk
-        curl -o /tmp/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz http://$APACHE_MIRROR/spark/spark-$SPARK_VERSION/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz
-        tar xvz -C /opt -f /tmp/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz
-        ln -s /opt/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/ /opt/spark
-        chown -R root.root /opt/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/*
-        cp /opt/spark/conf/spark-env.sh.template /opt/spark/conf/spark-env.sh
-        sed -i 's/# - SPARK_MASTER_OPTS.*/SPARK_MASTER_OPTS="-Dspark.deploy.defaultCores=4 -Dspark.executor.memory=2G"/' /opt/spark/conf/spark-env.sh
-        echo $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/) $HOSTNAME | sudo tee -a /etc/hosts
-        /opt/spark/sbin/start-master.sh -h $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/)            
+        - port: { get_resource: port_master }
+      user_data:
+        str_replace:
+          params:
+            wc_notify: { get_attr: ['wait_handle', 'curl_cli'] }
+          template: |
+            #!/bin/bash
+            SPARK_VERSION="2.0.2"
+            HADOOP_VERSION="2.7"
+            APACHE_MIRROR="ftp.carnet.hr/misc/apache"
+            LOCALNET="10.20.30.0/24"
+            ufw allow from $LOCALNET
+            ufw allow 80/tcp
+            ufw allow 443/tcp
+            ufw allow 4040:4050/tcp
+            ufw allow 7077/tcp
+            ufw allow 8080/tcp
+            apt-get -y update
+            apt-get -y install openjdk-7-jdk
+            curl -o /tmp/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz http://$APACHE_MIRROR/spark/spark-$SPARK_VERSION/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz
+            tar xvz -C /opt -f /tmp/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION.tgz
+            ln -s /opt/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/ /opt/spark
+            chown -R root.root /opt/spark-$SPARK_VERSION-bin-hadoop$HADOOP_VERSION/*
+            cp /opt/spark/conf/spark-env.sh.template /opt/spark/conf/spark-env.sh
+            sed -i 's/# - SPARK_MASTER_OPTS.*/SPARK_MASTER_OPTS="-Dspark.deploy.defaultCores=2 -Dspark.executor.memory=2G"/' /opt/spark/conf/spark-env.sh
+            echo $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/) $HOSTNAME | sudo tee -a /etc/hosts
+            /opt/spark/sbin/start-master.sh -h $(ip -o addr show dev eth0 | fgrep "inet " | egrep -o '[0-9.]+/[0-9]+' | cut -f1 -d/)
+            wc_notify --data-binary '{"status": "SUCCESS"}'
+
   floating_ip:
     type: OS::Neutron::FloatingIP
     properties:
@@ -73,14 +91,12 @@ resources:
     type: OS::Neutron::FloatingIPAssociation
     properties:
       floatingip_id: { get_resource: floating_ip }
-      port_id: { get_resource: port }  
+      port_id: { get_resource: port_master } 
+
 outputs:
-  fixed_master:
-    description: Fixed IP assigned to the master node.
-    value: { get_attr: [master_node, networks, private_network, 0]}
-  name:
-    description: Name of the master node instance.
-    value: { get_attr: [master_node, name] }
-  floating_master:
-    description: Floating IP address of the master node.
-    value: { get_attr: [floating_ip, floating_ip_address] }
+   master_ip:
+     description: Floating IP of the master instance.
+     value: { get_attr: [master_node, networks, private_network, 0] }
+  # master_wc:
+    # description: ID of the master wait condition.
+    # value: { get_resource: [master_wait_condition]}

@@ -27,6 +27,7 @@ parameters:
     type: string
     label: Master node IP address
     description: Location of the master node on the private network.
+
 resources:
   port:
     type: OS::Neutron::Port
@@ -35,6 +36,7 @@ resources:
       security_groups:
         - { get_param: security_group }
         - default
+
   worker_node:
     type: OS::Nova::Server
     properties:
