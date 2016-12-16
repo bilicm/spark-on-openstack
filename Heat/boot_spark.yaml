@@ -26,6 +26,11 @@ parameters:
     label: Public Network
     description: Public Network where the Spark Master node is accessible.
     default: admin_floating_net
+  cluster_size:
+    type: number
+    label: Number of worker instances
+    description: Number of worker instances in the Spark cluster.
+    default: 1
 
 resources:
   security_group:
@@ -61,6 +66,7 @@ resources:
           direction: egress
         - protocol: icmp
           direction: ingress
+
   masterspark:
     type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/Heat/boot_sparkmas.yaml
     properties:
@@ -70,13 +76,18 @@ resources:
       public_network: { get_param: public_network }
       security_group: { get_resource: security_group }
       key: { get_param: key }
-  workerspark:
-    type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/Heat/boot_sparkslv.yaml
-    depends_on: masterspark
+
+  workercluster:
+    type: OS::Heat::ResourceGroup
+    #depends_on: masterspark
     properties:
-      image: { get_param: image }
-      flavor: { get_param: flavor }
-      private_network: { get_param: private_network }
-      security_group: { get_resource: security_group }
-      master_ip: { get_attr: [masterspark, master_ip]}
-      key: { get_param: key }
+      count: { get_param: cluster_size }
+      resource_def:
+        type: https://raw.githubusercontent.com/bilicm/spark-on-openstack/master/Heat/boot_sparkslv.yaml
+        properties:
+          image: { get_param: image }
+          flavor: { get_param: flavor }
+          private_network: { get_param: private_network }
+          security_group: { get_resource: security_group }
+          master_ip: { get_attr: [masterspark, master_ip]}
+          key: { get_param: key }

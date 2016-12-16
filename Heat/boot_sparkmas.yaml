@@ -96,7 +96,7 @@ resources:
 outputs:
    master_ip:
      description: Floating IP of the master instance.
-     value: { get_attr: [master_node, networks, private_network, 0] }
+     value: { get_attr: [port_master, fixed_ips, 0, ip_address] }
   # master_wc:
     # description: ID of the master wait condition.
     # value: { get_resource: [master_wait_condition]}
